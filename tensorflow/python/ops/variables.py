@@ -23,7 +23,6 @@ from tensorflow.python.framework import ops
 from tensorflow.python.framework import tensor_shape
 from tensorflow.python.ops import array_ops
 from tensorflow.python.ops import control_flow_ops
-from tensorflow.python.ops import gen_state_ops
 from tensorflow.python.ops import math_ops
 from tensorflow.python.ops import state_ops
 from tensorflow.python.util.deprecation import deprecated
@@ -224,6 +223,9 @@ class Variable(object):
           dtype=dtype,
           expected_shape=expected_shape)
 
+  def __str__(self):
+    return str(self._snapshot)
+
   def _init_from_args(self,
                       initial_value=None,
                       trainable=True,
@@ -314,14 +316,9 @@ class Variable(object):
         if init_from_fn:
           expected_shape_list = full_shape_to_list(expected_shape)
           set_shape = validate_shape and expected_shape.is_fully_defined()
-          self._variable = gen_state_ops._variable(
-              shape=expected_shape_list, 
-              dtype=dtype.base_dtype, 
-              name=name, 
-              container="", 
-              shared_name="")
-          if set_shape:
-            self._variable.set_shape(expected_shape_list)
+          self._variable = state_ops.variable_op(
+              expected_shape_list, dtype.base_dtype, set_shape=set_shape,
+              name=name)
           with ops.colocate_with(self._variable.op):
             with ops.name_scope("Initializer"):
               # Colocate the tensors created by the initial_value() function
@@ -339,15 +336,12 @@ class Variable(object):
                        and self._initial_value.get_shape().is_fully_defined())
           # In this case, the variable op can't be created until after the
           # initial_value has been converted to a Tensor with a known type.
-          self._variable = gen_state_ops._variable(
-              shape=full_shape_to_list(self._initial_value.get_shape()),
-              dtype=self._initial_value.dtype.base_dtype,
-              name=name, 
-              container="", 
-              shared_name="")
-          if set_shape:
-            self._variable.set_shape(
-                full_shape_to_list(self._initial_value.get_shape()))
+          self._variable = state_ops.variable_op(
+              full_shape_to_list(self._initial_value.get_shape()),
+              self._initial_value.dtype.base_dtype,
+              set_shape=set_shape,
+              name=name)
+
         # Manually overrides the variable's shape with the initial value's.
         if validate_shape:
           initial_value_shape = self._initial_value.get_shape()
@@ -409,7 +403,7 @@ class Variable(object):
     """Conversion function for Graph.as_graph_element()."""
     return self._variable
 
-  def _AsTensor(self):
+  def _AsTensor(self):  # pylint: disable=invalid-name
     """Converts this variable to a Tensor.
 
     See [`value()`](#Variable.value).
@@ -639,7 +633,7 @@ class Variable(object):
 
   # Conversion to tensor.
   @staticmethod
-  def _TensorConversionFunction(v, dtype=None, name=None, as_ref=False):
+  def _TensorConversionFunction(v, dtype=None, name=None, as_ref=False):  # pylint: disable=invalid-name
     """Utility function for converting a Variable to a Tensor."""
     _ = name
     if dtype and not dtype.is_compatible_with(v.dtype):
@@ -652,7 +646,7 @@ class Variable(object):
       return v.value()
 
   @staticmethod
-  def _OverloadAllOperators():
+  def _OverloadAllOperators():  # pylint: disable=invalid-name
     """Register overloads for all operators."""
     for operator in ops.Tensor.OVERLOADABLE_OPERATORS:
       Variable._OverloadOperator(operator)
@@ -662,7 +656,7 @@ class Variable(object):
     setattr(Variable, "__getitem__", array_ops._SliceHelperVar)
 
   @staticmethod
-  def _OverloadOperator(operator):
+  def _OverloadOperator(operator):  # pylint: disable=invalid-name
     """Defer an operator overload to `ops.Tensor`.
 
     We pull the operator out of ops.Tensor dynamically to avoid ordering issues.
@@ -1004,6 +998,7 @@ class PartitionedVariable(object):
 
   @staticmethod
   def _TensorConversionFunction(v, dtype=None, name=None, as_ref=False):
+    # pylint: disable=invalid-name
     _ = name
     if dtype is not None and not dtype.is_compatible_with(v.dtype):
       raise ValueError(

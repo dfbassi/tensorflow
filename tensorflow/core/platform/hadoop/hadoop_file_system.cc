@@ -56,8 +56,8 @@ class LibHDFS {
   std::function<hdfsFS(hdfsBuilder*)> hdfsBuilderConnect;
   std::function<hdfsBuilder*()> hdfsNewBuilder;
   std::function<void(hdfsBuilder*, const char*)> hdfsBuilderSetNameNode;
-  std::function<void(hdfsBuilder*, const char *kerbTicketCachePath)>
-    hdfsBuilderSetKerbTicketCachePath;
+  std::function<void(hdfsBuilder*, const char* kerbTicketCachePath)>
+      hdfsBuilderSetKerbTicketCachePath;
   std::function<int(hdfsFS, hdfsFile)> hdfsCloseFile;
   std::function<tSize(hdfsFS, hdfsFile, tOffset, void*, tSize)> hdfsPread;
   std::function<tSize(hdfsFS, hdfsFile, const void*, tSize)> hdfsWrite;
@@ -297,15 +297,13 @@ Status HadoopFileSystem::NewReadOnlyMemoryRegionFromFile(
   return errors::Unimplemented("HDFS does not support ReadOnlyMemoryRegion");
 }
 
-bool HadoopFileSystem::FileExists(const string& fname) {
+Status HadoopFileSystem::FileExists(const string& fname) {
   hdfsFS fs = nullptr;
-  Status status = Connect(fname, &fs);
-  if (!status.ok()) {
-    LOG(ERROR) << "Connect failed: " << status.error_message();
-    return false;
+  TF_RETURN_IF_ERROR(Connect(fname, &fs));
+  if (hdfs_->hdfsExists(fs, TranslateName(fname).c_str()) == 0) {
+    return Status::OK();
   }
-
-  return hdfs_->hdfsExists(fs, TranslateName(fname).c_str()) == 0;
+  return errors::NotFound(fname, " not found.");
 }
 
 Status HadoopFileSystem::GetChildren(const string& dir,
